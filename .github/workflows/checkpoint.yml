@@ -1,0 +1,55 @@
+name: Verificar entorno del proyecto
+on:
+  push:
+    paths: ['.github/workflows/checkpoint.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  entorno:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Construir y verificar el contenedor
+        run: |
+          cp .env.example .env
+          docker build -t clima .
+          docker run -d --name clima --hostname clima --env-file .env -v "$PWD:/workspaces/clima" -w /workspaces/clima clima sleep infinity
+          docker exec clima python src/check_env.py
+      - name: Capturar el explorador y la terminal integrada de VS Code
+        env:
+          DISPLAY: ':99'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y xvfb xdotool imagemagick x11-utils
+          curl -fsSL https://update.code.visualstudio.com/latest/linux-x64/stable -o /tmp/code.tgz
+          mkdir -p /tmp/vscode /tmp/perfil/User /tmp/evidencia
+          tar xzf /tmp/code.tgz -C /tmp/vscode --strip-components=1
+          echo '{"workbench.startupEditor":"none","security.workspace.trust.enabled":false,"explorer.compactFolders":false,"window.zoomLevel":1,"terminal.integrated.shellIntegration.enabled":false}' > /tmp/perfil/User/settings.json
+          Xvfb :99 -screen 0 1440x1000x24 >/tmp/display.log 2>&1 &
+          sleep 2
+          /tmp/vscode/code --disable-gpu --no-sandbox --disable-extensions --user-data-dir=/tmp/perfil "$PWD" "$PWD/src/check_env.py" >/tmp/editor.log 2>&1 &
+          for i in $(seq 1 40); do wid=$(xdotool search --onlyvisible --name 'Visual Studio Code' | tail -1 || true); [ -n "$wid" ] && break; sleep 1; done
+          test -n "$wid"
+          xdotool windowsize "$wid" 1440 1000 windowmove "$wid" 0 0 windowfocus "$wid"
+          sleep 5
+          xdotool key Escape ctrl+shift+e
+          sleep 1
+          import -window root /tmp/evidencia/explorador.jpg
+          xdotool key ctrl+grave
+          sleep 3
+          xdotool type 'docker exec -it clima bash'
+          xdotool key Return
+          sleep 2
+          xdotool type 'python src/check_env.py'
+          xdotool key Return
+          sleep 2
+          import -window root /tmp/evidencia/terminal.jpg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: capturas-checkpoint
+          path: /tmp/evidencia/
+          retention-days: 1
