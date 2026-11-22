@@ -25,21 +25,24 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y xvfb xdotool imagemagick x11-utils
-          curl -fsSL https://update.code.visualstudio.com/latest/linux-x64/stable -o /tmp/code.tgz
+          curl -fsSL https://update.code.visualstudio.com/1.95.3/linux-x64/stable -o /tmp/code.tgz
           mkdir -p /tmp/vscode /tmp/perfil/User /tmp/evidencia
           tar xzf /tmp/code.tgz -C /tmp/vscode --strip-components=1
           echo '{"workbench.startupEditor":"none","security.workspace.trust.enabled":false,"explorer.compactFolders":false,"window.zoomLevel":1,"terminal.integrated.shellIntegration.enabled":false}' > /tmp/perfil/User/settings.json
           Xvfb :99 -screen 0 1440x1000x24 >/tmp/display.log 2>&1 &
           sleep 2
-          /tmp/vscode/code --disable-gpu --no-sandbox --disable-extensions --user-data-dir=/tmp/perfil "$PWD" "$PWD/src/check_env.py" >/tmp/editor.log 2>&1 &
+          /tmp/vscode/code --skip-welcome --skip-release-notes --disable-gpu --no-sandbox --disable-extensions --user-data-dir=/tmp/perfil "$PWD" "$PWD/src/check_env.py" >/tmp/editor.log 2>&1 &
           for i in $(seq 1 40); do wid=$(xdotool search --onlyvisible --name 'Visual Studio Code' | tail -1 || true); [ -n "$wid" ] && break; sleep 1; done
           test -n "$wid"
           xdotool windowsize "$wid" 1440 1000 windowmove "$wid" 0 0 windowfocus "$wid"
-          sleep 5
+          sleep 10
           xdotool key Escape ctrl+shift+e
           sleep 1
           import -window root /tmp/evidencia/explorador.jpg
-          xdotool key ctrl+grave
+          xdotool key Escape ctrl+shift+p
+          sleep 1
+          xdotool type 'Terminal: Create New Terminal'
+          xdotool key Return
           sleep 3
           xdotool type 'docker exec -it clima bash'
           xdotool key Return
